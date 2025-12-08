@@ -29,29 +29,31 @@ import androidx.compose.ui.unit.sp
 import com.example.pawfectcare.ui.theme.PawfectCareTheme
 import com.google.firebase.auth.FirebaseAuth
 
-class LoginActivity : ComponentActivity() {
+class SignupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PawfectCareTheme {
-                LoginScreen()
+                SignupScreen()
             }
         }
     }
 }
 
 @Composable
-fun LoginScreen() {
+fun SignupScreen() {
     val context = LocalContext.current
     val auth = remember { FirebaseAuth.getInstance() }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // 🐾 Warm brown gradient background
+    // 🐾 Warm brown gradient background (same tone as login)
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFFFE0B2), // light caramel
@@ -72,18 +74,17 @@ fun LoginScreen() {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Text(
-                text = "Welcome to PawfectCare 🐾",
-                fontSize = 26.sp,
+                text = "Create your PawfectCare account 🐾",
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF4E342E), // dark brown text
+                color = Color(0xFF4E342E),
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Email input field
+            // Email
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -97,7 +98,7 @@ fun LoginScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password input field with visibility toggle
+            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -116,29 +117,58 @@ fun LoginScreen() {
                 shape = RoundedCornerShape(12.dp)
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Confirm Password
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text("Confirm Password") },
+                singleLine = true,
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val icon = if (confirmPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(imageVector = icon, contentDescription = null)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                shape = RoundedCornerShape(12.dp)
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Login Button
+            // Sign Up Button
             Button(
                 onClick = {
                     // Basic validation
-                    if (email.isBlank() || password.isBlank()) {
-                        Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
+                    if (email.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
+                        Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (password != confirmPassword) {
+                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (password.length < 6) {
+                        Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
                     isLoading = true
-                    auth.signInWithEmailAndPassword(email.trim(), password)
+                    auth.createUserWithEmailAndPassword(email.trim(), password)
                         .addOnCompleteListener { task ->
                             isLoading = false
                             if (task.isSuccessful) {
-                                Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
-                                //  Navigate to HomeActivity (create it if you haven't yet)
-                                context.startActivity(Intent(context, HomeActivity::class.java))
+                                Toast.makeText(context, "Account created successfully", Toast.LENGTH_SHORT).show()
+                                // Go back to Login screen
+                                context.startActivity(Intent(context, LoginActivity::class.java))
                             } else {
                                 Toast.makeText(
                                     context,
-                                    task.exception?.localizedMessage ?: "Login failed",
+                                    task.exception?.localizedMessage ?: "Signup failed",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -151,11 +181,11 @@ fun LoginScreen() {
                     .padding(horizontal = 8.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF6D4C41) // dark brown button
+                    containerColor = Color(0xFF6D4C41) // dark brown
                 )
             ) {
                 Text(
-                    text = if (isLoading) "Logging in..." else "Login",
+                    text = if (isLoading) "Creating account..." else "Sign Up",
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold
@@ -164,13 +194,13 @@ fun LoginScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Sign-up navigation text
+            // Already have account? Login
             Text(
-                text = "Don't have an account? Sign up",
+                text = "Already have an account? Login",
                 color = Color(0xFF4E342E),
                 fontSize = 15.sp,
                 modifier = Modifier.clickable {
-                    context.startActivity(Intent(context, SignupActivity::class.java))
+                    context.startActivity(Intent(context, LoginActivity::class.java))
                 }
             )
         }
