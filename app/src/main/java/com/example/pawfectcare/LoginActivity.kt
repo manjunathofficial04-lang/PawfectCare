@@ -74,7 +74,7 @@ fun LoginScreen() {
         ) {
 
             Text(
-                text = "Welcome to PawfectCare 🐾",
+                text = "Welcome to PawfectCare",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF4E342E), // dark brown text
