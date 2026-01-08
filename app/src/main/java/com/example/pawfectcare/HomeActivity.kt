@@ -1,29 +1,35 @@
 package com.example.pawfectcare
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.core.content.ContextCompat
 import com.example.pawfectcare.ui.theme.PawfectCareTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -36,8 +42,7 @@ class HomeActivity : ComponentActivity() {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseFirestore.getInstance()
 
-        // 🔸 TEMPORARY SAMPLE DATA – REMOVE LATER TO AVOID DUPLICATION
-        seedSampleDataOnce(db, auth)
+
 
         enableEdgeToEdge()
         setContent {
@@ -47,76 +52,7 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Seeds sample Pets and Owner Contacts into Firestore
-     *  You can remove this later once you have real data.
-     */
-    private fun seedSampleDataOnce(db: FirebaseFirestore, auth: FirebaseAuth) {
-        val uid = auth.currentUser?.uid ?: return
 
-        // --- Pets collection ---
-        val petsCollection = db.collection("users")
-            .document(uid)
-            .collection("pets")
-
-        petsCollection.get().addOnSuccessListener { snapshot ->
-            if (!snapshot.isEmpty) return@addOnSuccessListener
-
-            val samplePets = listOf(
-                Pet(name = "Buddy", type = "Dog", breed = "Labrador", age = 2),
-                Pet(name = "Milo", type = "Cat", breed = "Siamese", age = 1),
-                Pet(name = "Rocky", type = "Dog", breed = "German Shepherd", age = 4),
-                Pet(name = "Bella", type = "Cat", breed = "Persian", age = 3),
-                Pet(name = "Max", type = "Dog", breed = "Beagle", age = 5)
-            )
-
-            samplePets.forEach { pet ->
-                val docRef = petsCollection.document()
-                val petWithId = pet.copy(id = docRef.id)
-                docRef.set(petWithId)
-            }
-        }
-
-        // --- Owner Contacts collection ---
-        val ownersCollection = db.collection("users")
-            .document(uid)
-            .collection("owners")
-
-        ownersCollection.get().addOnSuccessListener { snapshot ->
-            if (!snapshot.isEmpty) return@addOnSuccessListener
-
-            val sampleOwners = listOf(
-                OwnerContact(
-                    id = "",
-                    name = "John Smith",
-                    phone = "+44 7123 456789",
-                    email = "john.smith@example.com",
-                    address = "12 Bark Street, London"
-                ),
-                OwnerContact(
-                    id = "",
-                    name = "Emma Johnson",
-                    phone = "+44 7011 223344",
-                    email = "emma.johnson@example.com",
-                    address = "45 Paw Lane, Manchester"
-                ),
-                OwnerContact(
-                    id = "",
-                    name = "Liam Brown",
-                    phone = "+44 7312 998877",
-                    email = "liam.brown@example.com",
-                    address = "78 Whisker Road, Birmingham"
-                )
-            )
-
-            sampleOwners.forEach { owner ->
-                val docRef = ownersCollection.document()
-                val ownerWithId = owner.copy(id = docRef.id)
-                docRef.set(ownerWithId)
-            }
-        }
-    }
-}
 
 // Data models
 data class Pet(
@@ -140,8 +76,23 @@ enum class HomeTab {
     OWNERS
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
+    val context = LocalContext.current
+
+    // ✅ Correct Compose permission launcher
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            Toast.makeText(context, "Camera permission granted ✅", Toast.LENGTH_SHORT).show()
+            // Later: open camera / capture photo
+        } else {
+            Toast.makeText(context, "Camera permission denied ❌", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFFFE0B2),
@@ -153,6 +104,42 @@ fun HomeScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
     var selectedTab by rememberSaveable { mutableStateOf(HomeTab.PETS) }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "PawfectCare",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                },
+                actions = {
+                    // ✅ Camera icon TOP RIGHT
+                    IconButton(onClick = {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (granted) {
+                            Toast.makeText(context, "Camera already allowed 📸", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // ✅ Ask permission when clicked
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Camera",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF6D4C41)
+                )
+            )
+        },
         bottomBar = {
             BottomNavigationBar(
                 selectedTab = selectedTab,
@@ -175,6 +162,7 @@ fun HomeScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
         }
     }
 }
+
 
 @Composable
 fun BottomNavigationBar(
@@ -206,7 +194,6 @@ fun PetsScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
     var pets by remember { mutableStateOf(listOf<Pet>()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Load pets
     LaunchedEffect(Unit) {
         val uid = auth.currentUser?.uid ?: return@LaunchedEffect
 
@@ -224,9 +211,7 @@ fun PetsScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
             }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Your Pawfect Pets 🐾",
             fontSize = 24.sp,
@@ -239,16 +224,10 @@ fun PetsScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = Color(0xFF6D4C41))
                     }
                 }
@@ -276,8 +255,7 @@ fun PetsScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(pets) { pet ->
@@ -296,7 +274,6 @@ fun OwnersScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
     var owners by remember { mutableStateOf(listOf<OwnerContact>()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Load owner contacts
     LaunchedEffect(Unit) {
         val uid = auth.currentUser?.uid ?: return@LaunchedEffect
 
@@ -314,11 +291,9 @@ fun OwnersScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
             }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Text(
-            text = "Owner Contacts ",
+            text = "Owner Contacts",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF4E342E),
@@ -329,15 +304,10 @@ fun OwnersScreen(db: FirebaseFirestore, auth: FirebaseAuth) {
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = Color(0xFF6D4C41))
                     }
                 }
@@ -386,9 +356,7 @@ fun PetCard(pet: Pet) {
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = pet.name,
                 fontSize = 20.sp,
@@ -419,9 +387,7 @@ fun OwnerCard(owner: OwnerContact) {
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = owner.name,
                 fontSize = 20.sp,
@@ -448,4 +414,4 @@ fun OwnerCard(owner: OwnerContact) {
             )
         }
     }
-}
+}}

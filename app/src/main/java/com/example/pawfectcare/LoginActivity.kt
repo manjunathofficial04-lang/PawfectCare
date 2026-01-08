@@ -46,6 +46,13 @@ fun LoginScreen() {
     val context = LocalContext.current
     val auth = remember { FirebaseAuth.getInstance() }
 
+    //  GDPR consent state (stored locally so popup shows only once)
+    val prefs = remember {
+        context.getSharedPreferences("pawfectcare_prefs", android.content.Context.MODE_PRIVATE)
+    }
+    var gdprAccepted by remember { mutableStateOf(prefs.getBoolean("gdpr_accepted", false)) }
+    var showGdprDialog by remember { mutableStateOf(!gdprAccepted) }
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -59,6 +66,53 @@ fun LoginScreen() {
             Color(0xFF8D6E63)  // medium brown
         )
     )
+
+    //  GDPR POPUP (shows before sign-in use; blocks closing unless user accepts/declines)
+    if (showGdprDialog) {
+        AlertDialog(
+            onDismissRequest = { /* block outside dismiss */ },
+            title = { Text("GDPR & Privacy Notice") },
+            text = {
+                Column {
+                    Text(
+                        "We use your email to create and manage your PawfectCare account, " +
+                                "and to provide app features (like pet details and owner contacts).\n\n" +
+                                "We do not sell your data. You can request deletion of your account data anytime.\n\n" +
+                                "By tapping Accept, you consent to processing your data for account access and app functionality."
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "View Privacy Policy",
+                        color = Color(0xFF4E342E),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable {
+                            Toast.makeText(context, "Open your Privacy Policy screen/link", Toast.LENGTH_SHORT).show()
+                            // Optional: navigate to a PrivacyPolicyActivity/WebView if you have one
+                            // context.startActivity(Intent(context, PrivacyPolicyActivity::class.java))
+                        }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        prefs.edit().putBoolean("gdpr_accepted", true).apply()
+                        gdprAccepted = true
+                        showGdprDialog = false
+                    }
+                ) { Text("Accept") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        // If user declines, close login (or take them to a limited mode screen)
+                        Toast.makeText(context, "You must accept to use login features.", Toast.LENGTH_SHORT).show()
+                        (context as? ComponentActivity)?.finish()
+                    }
+                ) { Text("Decline") }
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -77,13 +131,12 @@ fun LoginScreen() {
                 text = "Welcome to PawfectCare",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF4E342E), // dark brown text
+                color = Color(0xFF4E342E),
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Email input field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -97,7 +150,6 @@ fun LoginScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password input field with visibility toggle
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -118,10 +170,15 @@ fun LoginScreen() {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Login Button
             Button(
                 onClick = {
-                    // Basic validation
+                    // ✅ Block login if GDPR not accepted
+                    if (!gdprAccepted) {
+                        showGdprDialog = true
+                        Toast.makeText(context, "Please accept GDPR to continue.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
                     if (email.isBlank() || password.isBlank()) {
                         Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
                         return@Button
@@ -133,7 +190,6 @@ fun LoginScreen() {
                             isLoading = false
                             if (task.isSuccessful) {
                                 Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
-                                //  Navigate to HomeActivity (create it if you haven't yet)
                                 context.startActivity(Intent(context, HomeActivity::class.java))
                             } else {
                                 Toast.makeText(
@@ -151,7 +207,7 @@ fun LoginScreen() {
                     .padding(horizontal = 8.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF6D4C41) // dark brown button
+                    containerColor = Color(0xFF6D4C41)
                 )
             ) {
                 Text(
@@ -164,7 +220,6 @@ fun LoginScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Sign-up navigation text
             Text(
                 text = "Don't have an account? Sign up",
                 color = Color(0xFF4E342E),
